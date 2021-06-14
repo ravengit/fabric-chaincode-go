@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/hyperledger/fabric-chaincode-go/shim/internal/mock"
-	"github.com/hyperledger/fabric-protos-go/common"
-	"github.com/hyperledger/fabric-protos-go/ledger/queryresult"
-	peerpb "github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/ravengit/fabric-chaincode-go/shim/internal/mock"
+	"github.com/ravengit/fabric-protos-go/common"
+	"github.com/ravengit/fabric-protos-go/ledger/queryresult"
+	peerpb "github.com/ravengit/fabric-protos-go/peer"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"

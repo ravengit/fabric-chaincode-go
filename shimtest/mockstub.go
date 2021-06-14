@@ -19,9 +19,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/hyperledger/fabric-chaincode-go/shim"
-	"github.com/hyperledger/fabric-protos-go/ledger/queryresult"
-	pb "github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/ravengit/fabric-chaincode-go/shim"
+	"github.com/ravengit/fabric-protos-go/ledger/queryresult"
+	pb "github.com/ravengit/fabric-protos-go/peer"
 )
 
 const (
