@@ -10,13 +10,101 @@ import (
 	"fmt"
 	"os"
 	"unicode/utf8"
-
+	// Ravenpod //
+	"github.com/ravengit/ravenpod-cc-dc-go/model"
+	"github.com/ravengit/ravenpod-cc-dc-go/datapublisher"
+    guuid "github.com/google/uuid"
+	"runtime"
+	"strings"
+    "encoding/json"    
+	"strconv"	
+	// Ravenpod //
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/ravengit/fabric-protos-go/common"
 	"github.com/ravengit/fabric-protos-go/ledger/queryresult"
 	pb "github.com/ravengit/fabric-protos-go/peer"
 )
+
+// Ravenpod
+const (
+	FABRIC_LEDGER_MODULE_NAME = "FABRIC LEDGER"
+	CHANNEL_STATE_DATA = "CHANNEL STATE DATA"
+)
+// Ravenpod
+
+
+// Ravenpod
+func (s *ChaincodeStub) instrumentStateGetter(collection, startKey string, endKey string) {
+
+	// Get transient map
+	transientMap, err := s.GetTransient()
+	if err != nil {
+		fmt.Println("[RAVENPOD] Error when accessing transient map.")
+		return
+	}
+	j, _ := json.Marshal(transientMap)
+	tMapInJsonStr := string (j)	
+
+	// Get method name
+	pc := make([]uintptr, 15)
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+	frame, _ := frames.Next()
+	splits := strings.Split(frame.Function, ".")
+	methodName := splits[len(splits) - 1]
+	fmt.Println("[RAVENPOD] methodNmae = ", methodName)
+
+	// Get collection and key
+    if len(collection) == 0 {
+		collection = CHANNEL_STATE_DATA
+	}
+    key := startKey
+	if len(endKey) > 0 {
+		key += ":" + endKey
+	}
+	
+	hasRavenpodData := transientMap["rp_webTxnId"]
+	if len(hasRavenpodData) > 0 {
+		invocationId := guuid.New().String()
+		webTxnId := string(transientMap["rp_webTxnId"])
+		ravenpodTxnId := string(transientMap["rp_ravenpodTxnId"])
+		blockchainTxnId := s.GetTxID()
+		accountId := string(transientMap["rp_accountId"])
+		channel := string(transientMap["rp_channel"])
+		nestLevel, _ := strconv.Atoi( string(transientMap["rp_nestLevel"]) )
+		sequenceNumber, _ := strconv.Atoi( string(transientMap["rp_sequenceNumber"]) )
+		mspId, _ := GetMSPID()
+		traceRecord := model.NewTraceRecord(
+			accountId,
+			webTxnId,
+			ravenpodTxnId,
+			blockchainTxnId,
+			invocationId,
+			channel,
+			false,
+			sequenceNumber,
+			nestLevel,
+			FABRIC_LEDGER_MODULE_NAME,
+			methodName,
+			key,
+			tMapInJsonStr,
+			collection,
+			"",
+			model.EVENT_TYPE_ENTRY,
+			"")
+		fmt.Println(mspId, traceRecord)
+		dataPublisher := datapublisher.GetDataPublisher()
+		dataPublisher.PushTraceRecord(traceRecord)
+		// TO DO
+		// Integrating data collector and publisher and then publish the traceRecord
+	} else {
+		// log.Println("Ravenpod context data not found. Did you enable Ravenpod data collector in the web app?")
+		return
+	}
+
+}
+// Ravenpod
 
 // ChaincodeStub is an object passed to chaincode for shim side handling of
 // APIs.
@@ -160,6 +248,7 @@ func (s *ChaincodeStub) InvokeChaincode(chaincodeName string, args [][]byte, cha
 
 // GetState documentation can be found in interfaces.go
 func (s *ChaincodeStub) GetState(key string) ([]byte, error) {
+	fmt.Println("[RAVENPOD] GetState")
 	// Access public data by setting the collection to empty string
 	collection := ""
 	return s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
@@ -410,6 +499,10 @@ func (s *ChaincodeStub) handleGetQueryResult(collection, query string,
 
 // GetStateByRange documentation can be found in interfaces.go
 func (s *ChaincodeStub) GetStateByRange(startKey, endKey string) (StateQueryIteratorInterface, error) {
+	// ravenpod
+	fmt.Println("[RAVENPOD] GetStateByRange")
+	s.instrumentStateGetter("", startKey, endKey)
+	// Ravenpod
 	if startKey == "" {
 		startKey = emptyKeySubstitute
 	}
