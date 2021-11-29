@@ -18,6 +18,7 @@ import (
 	"strings"
     "encoding/json"    
 	"strconv"	
+	"time"
 	// Ravenpod //
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -35,7 +36,7 @@ const (
 
 
 // Ravenpod
-func (s *ChaincodeStub) instrumentStateGetter(collection, startKey string, endKey string) {
+func (s *ChaincodeStub) instrumentStateDeletion(collection string, key string, eventType int, entryTime time.Time) {
 
 	// Get transient map
 	transientMap, err := s.GetTransient()
@@ -53,19 +54,16 @@ func (s *ChaincodeStub) instrumentStateGetter(collection, startKey string, endKe
 	frame, _ := frames.Next()
 	splits := strings.Split(frame.Function, ".")
 	methodName := splits[len(splits) - 1]
-	fmt.Println("[RAVENPOD] methodNmae = ", methodName)
+	fmt.Println("[RAVENPOD] Capturing trace. methodNmae, eventType", methodName, eventType)
 
 	// Get collection and key
     if len(collection) == 0 {
 		collection = CHANNEL_STATE_DATA
 	}
-    key := startKey
-	if len(endKey) > 0 {
-		key += ":" + endKey
-	}
 	
 	hasRavenpodData := transientMap["rp_webTxnId"]
 	if len(hasRavenpodData) > 0 {
+		dataPublisher := datapublisher.GetDataPublisher()
 		invocationId := guuid.New().String()
 		webTxnId := string(transientMap["rp_webTxnId"])
 		ravenpodTxnId := string(transientMap["rp_ravenpodTxnId"])
@@ -91,15 +89,234 @@ func (s *ChaincodeStub) instrumentStateGetter(collection, startKey string, endKe
 			tMapInJsonStr,
 			collection,
 			"",
-			model.EVENT_TYPE_ENTRY,
+			eventType,
 			"")
-		fmt.Println(mspId, traceRecord)
-		dataPublisher := datapublisher.GetDataPublisher()
-		dataPublisher.PushTraceRecord(traceRecord)
-		// TO DO
-		// Integrating data collector and publisher and then publish the traceRecord
+		if eventType == model.EVENT_TYPE_ENTRY {
+			dataPublisher.PushTraceRecord(traceRecord)
+			nestLevel++                       
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+		} else {
+			timeTaken := time.Now().Sub(entryTime).Milliseconds()
+			nestLevel--
+			dataPublisher.PushTraceRecord(traceRecord)
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+			keyTraceRecord := model.NewKeyTraceRecord(
+				accountId,
+				webTxnId,
+				ravenpodTxnId,
+				blockchainTxnId,
+				mspId,
+				channel,
+				collection,
+				key,
+				"",
+				model.OPERATION_TYPE_DELETE,
+				"",
+				"",
+				timeTaken)
+			dataPublisher.PushKeyTraceRecord(keyTraceRecord)
+		}
 	} else {
-		// log.Println("Ravenpod context data not found. Did you enable Ravenpod data collector in the web app?")
+		fmt.Println("Ravenpod context data not found. Did you enable Ravenpod data collector in the web app?")
+		return
+	}
+
+}
+
+func (s *ChaincodeStub) instrumentStateSetter(collection string, key string, value []byte, eventType int, entryTime time.Time) {
+	// Get transient map
+	transientMap, err := s.GetTransient()
+	if err != nil {
+		fmt.Println("[RAVENPOD] Error when accessing transient map.")
+		return
+	}
+	j, _ := json.Marshal(transientMap)
+	tMapInJsonStr := string (j)	
+
+	// Get method name
+	pc := make([]uintptr, 15)
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+	frame, _ := frames.Next()
+	splits := strings.Split(frame.Function, ".")
+	methodName := splits[len(splits) - 1]
+	fmt.Println("[RAVENPOD] Capturing trace. methodNmae, eventType", methodName, eventType)
+
+	// Get collection, key and value
+	valueInStr := string(value)
+    if len(collection) == 0 {
+		collection = CHANNEL_STATE_DATA
+	}
+
+	args := struct {
+		key    string
+		value  string
+	}{
+		key:    key,
+		value:  valueInStr,
+	}
+	argsBuffer, err := json.Marshal(args)
+
+	hasRavenpodData := transientMap["rp_webTxnId"]
+	if len(hasRavenpodData) > 0 {
+		dataPublisher := datapublisher.GetDataPublisher()
+		invocationId := guuid.New().String()
+		webTxnId := string(transientMap["rp_webTxnId"])
+		ravenpodTxnId := string(transientMap["rp_ravenpodTxnId"])
+		blockchainTxnId := s.GetTxID()
+		accountId := string(transientMap["rp_accountId"])
+		channel := string(transientMap["rp_channel"])
+		nestLevel, _ := strconv.Atoi( string(transientMap["rp_nestLevel"]) )
+		sequenceNumber, _ := strconv.Atoi( string(transientMap["rp_sequenceNumber"]) )
+		mspId, _ := GetMSPID()
+		traceRecord := model.NewTraceRecord(
+			accountId,
+			webTxnId,
+			ravenpodTxnId,
+			blockchainTxnId,
+			invocationId,
+			channel,
+			false,
+			sequenceNumber,
+			nestLevel,
+			FABRIC_LEDGER_MODULE_NAME,
+			methodName,
+			string(argsBuffer),
+			tMapInJsonStr,
+			collection,
+			"",
+			eventType,
+			"")
+		if eventType == model.EVENT_TYPE_ENTRY {
+			dataPublisher.PushTraceRecord(traceRecord)
+			nestLevel++                       
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+		} else {
+			timeTaken := time.Now().Sub(entryTime).Milliseconds()
+			nestLevel--
+			dataPublisher.PushTraceRecord(traceRecord)
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+			keyTraceRecord := model.NewKeyTraceRecord(
+				accountId,
+				webTxnId,
+				ravenpodTxnId,
+				blockchainTxnId,
+				mspId,
+				channel,
+				collection,
+				key,
+				valueInStr,
+				model.OPERATION_TYPE_WRITE,
+				"",
+				"",
+				timeTaken)
+			dataPublisher.PushKeyTraceRecord(keyTraceRecord)
+		}	
+	} else {
+		fmt.Println("Ravenpod context data not found. Did you enable Ravenpod data collector in the web app?")
+		return
+	}		
+
+}
+
+func (s *ChaincodeStub) instrumentStateGetter(collection string, startKey string, endKey string, returnedValue []byte, eventType int, entryTime time.Time) {
+
+	// Get transient map
+	transientMap, err := s.GetTransient()
+	if err != nil {
+		fmt.Println("[RAVENPOD] Error when accessing transient map.")
+		return
+	}
+	j, _ := json.Marshal(transientMap)
+	tMapInJsonStr := string (j)	
+
+	// Get method name
+	pc := make([]uintptr, 15)
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+	frame, _ := frames.Next()
+	splits := strings.Split(frame.Function, ".")
+	methodName := splits[len(splits) - 1]
+	fmt.Println("[RAVENPOD] Capturing trace. methodNmae, eventType", methodName, eventType)
+
+	// Get collection and key
+    if len(collection) == 0 {
+		collection = CHANNEL_STATE_DATA
+	}
+    key := startKey
+	if len(endKey) > 0 {
+		key += ":" + endKey
+	}
+	
+	hasRavenpodData := transientMap["rp_webTxnId"]
+	if len(hasRavenpodData) > 0 {
+		dataPublisher := datapublisher.GetDataPublisher()
+		invocationId := guuid.New().String()
+		webTxnId := string(transientMap["rp_webTxnId"])
+		ravenpodTxnId := string(transientMap["rp_ravenpodTxnId"])
+		blockchainTxnId := s.GetTxID()
+		accountId := string(transientMap["rp_accountId"])
+		channel := string(transientMap["rp_channel"])
+		nestLevel, _ := strconv.Atoi( string(transientMap["rp_nestLevel"]) )
+		sequenceNumber, _ := strconv.Atoi( string(transientMap["rp_sequenceNumber"]) )
+		mspId, _ := GetMSPID()
+		traceRecord := model.NewTraceRecord(
+			accountId,
+			webTxnId,
+			ravenpodTxnId,
+			blockchainTxnId,
+			invocationId,
+			channel,
+			false,
+			sequenceNumber,
+			nestLevel,
+			FABRIC_LEDGER_MODULE_NAME,
+			methodName,
+			key,
+			tMapInJsonStr,
+			collection,
+			string(returnedValue), 
+			eventType,
+			"")
+		if eventType == model.EVENT_TYPE_ENTRY {
+			dataPublisher.PushTraceRecord(traceRecord)
+			nestLevel++                       
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+		} else {
+			timeTaken := time.Now().Sub(entryTime).Milliseconds()
+			nestLevel--
+			dataPublisher.PushTraceRecord(traceRecord)
+			sequenceNumber++
+			transientMap["rp_sequenceNumber"] = []byte(strconv.Itoa(sequenceNumber))
+			transientMap["rp_nestLevel"] = []byte(strconv.Itoa(nestLevel))		
+			keyTraceRecord := model.NewKeyTraceRecord(
+				accountId,
+				webTxnId,
+				ravenpodTxnId,
+				blockchainTxnId,
+				mspId,
+				channel,
+				collection,
+				key,
+				string(returnedValue),
+				model.OPERATION_TYPE_READ,
+				"",
+				"",
+				timeTaken)
+			dataPublisher.PushKeyTraceRecord(keyTraceRecord)
+		}
+	} else {
+		fmt.Println("Ravenpod context data not found. Did you enable Ravenpod data collector in the web app?")
 		return
 	}
 
@@ -248,10 +465,17 @@ func (s *ChaincodeStub) InvokeChaincode(chaincodeName string, args [][]byte, cha
 
 // GetState documentation can be found in interfaces.go
 func (s *ChaincodeStub) GetState(key string) ([]byte, error) {
-	fmt.Println("[RAVENPOD] GetState")
+	// ravenpod
+	var returnedValue []byte
+	var err error
+	entryTime := time.Now()
+	s.instrumentStateGetter("", key, "", nil, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateGetter("", key, "", returnedValue, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
 	// Access public data by setting the collection to empty string
 	collection := ""
-	return s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
+	returnedValue, err = s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
+	return returnedValue, err
 }
 
 // SetStateValidationParameter documentation can be found in interfaces.go
@@ -276,6 +500,11 @@ func (s *ChaincodeStub) PutState(key string, value []byte) error {
 	if key == "" {
 		return errors.New("key must not be an empty string")
 	}
+	// Ravenpod
+	entryTime := time.Now()
+	s.instrumentStateSetter("", key, value, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateSetter("", key, value, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
 	// Access public data by setting the collection to empty string
 	collection := ""
 	return s.handler.handlePutState(collection, key, value, s.ChannelID, s.TxID)
@@ -305,6 +534,12 @@ func (s *ChaincodeStub) GetQueryResult(query string) (StateQueryIteratorInterfac
 
 // DelState documentation can be found in interfaces.go
 func (s *ChaincodeStub) DelState(key string) error {
+	// Ravenpod
+	entryTime := time.Now()
+	s.instrumentStateDeletion("", key, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateDeletion("", key, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
+
 	// Access public data by setting the collection to empty string
 	collection := ""
 	return s.handler.handleDelState(collection, key, s.ChannelID, s.TxID)
@@ -317,7 +552,15 @@ func (s *ChaincodeStub) GetPrivateData(collection string, key string) ([]byte, e
 	if collection == "" {
 		return nil, fmt.Errorf("collection must not be an empty string")
 	}
-	return s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
+	// Ravenpod
+	var returnedValue []byte
+	var err error
+	entryTime := time.Now()
+	s.instrumentStateGetter(collection, key, "", nil, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateGetter(collection, key, "", returnedValue, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
+	returnedValue, err = s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
+	return returnedValue, err
 }
 
 // GetPrivateDataHash documentation can be found in interfaces.go
@@ -336,6 +579,11 @@ func (s *ChaincodeStub) PutPrivateData(collection string, key string, value []by
 	if key == "" {
 		return fmt.Errorf("key must not be an empty string")
 	}
+	// Ravenpod
+	entryTime := time.Now()
+	s.instrumentStateSetter(collection, key, value, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateSetter(collection, key, value, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
 	return s.handler.handlePutState(collection, key, value, s.ChannelID, s.TxID)
 }
 
@@ -344,6 +592,11 @@ func (s *ChaincodeStub) DelPrivateData(collection string, key string) error {
 	if collection == "" {
 		return fmt.Errorf("collection must not be an empty string")
 	}
+	// Ravenpod
+	entryTime := time.Now()
+	s.instrumentStateDeletion(collection, key, model.EVENT_TYPE_ENTRY, entryTime)
+	defer s.instrumentStateDeletion(collection, key, model.EVENT_TYPE_EXIT, entryTime)
+	// Ravenpod
 	return s.handler.handleDelState(collection, key, s.ChannelID, s.TxID)
 }
 
@@ -499,10 +752,6 @@ func (s *ChaincodeStub) handleGetQueryResult(collection, query string,
 
 // GetStateByRange documentation can be found in interfaces.go
 func (s *ChaincodeStub) GetStateByRange(startKey, endKey string) (StateQueryIteratorInterface, error) {
-	// ravenpod
-	fmt.Println("[RAVENPOD] GetStateByRange")
-	s.instrumentStateGetter("", startKey, endKey)
-	// Ravenpod
 	if startKey == "" {
 		startKey = emptyKeySubstitute
 	}

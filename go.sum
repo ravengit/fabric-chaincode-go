@@ -23,8 +23,10 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfC
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/ravengit/fabric-protos-go v0.0.0-20210614222623-7c3d506e04de h1:mikCvzgjCJwB4C5Jz3Jqq0LE9E3Hxg+VETJ2Rp3UpTk=
-github.com/ravengit/fabric-protos-go v0.0.0-20210614222623-7c3d506e04de/go.mod h1:1jZOeE9KRifBmjwVgA/OhTw51OV/O4T2zUZCPe0FUPY=
+github.com/ravengit/fabric-protos-go v1.0.0 h1:Y/0Bpxzd4miA79Hz+bAlVLuYn/ktA/jsxkB0Wap+ryM=
+github.com/ravengit/fabric-protos-go v1.0.0/go.mod h1:1jZOeE9KRifBmjwVgA/OhTw51OV/O4T2zUZCPe0FUPY=
+github.com/ravengit/ravenpod-cc-dc-go v1.0.2 h1:5cYAhLX0XD03MIKlJOJ1K5V8xGcEEism2omGbGrLEiI=
+github.com/ravengit/ravenpod-cc-dc-go v1.0.2/go.mod h1:nSRomkqhhrkB/M8ED3Qf8j7C2B8750ZIt+PxDN4eGjE=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.6.1 h1:hDPOHmpOpP40lSULcqw7IrRb/u7w6RpDC9399XyoNd0=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
