@@ -6,7 +6,7 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/google/uuid v1.3.0
 	github.com/ravengit/fabric-protos-go v1.0.0
-	github.com/ravengit/ravenpod-cc-dc-go v1.0.2
+	github.com/ravengit/ravenpod-cc-dc-go v1.0.3
 	github.com/stretchr/testify v1.6.1
 	google.golang.org/grpc v1.23.0
 )
@@ -22,3 +22,6 @@ require (
 	google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c // indirect
 )
+
+// replace github.com/ravengit/fabric-protos-go => /Users/calvinso/projects/fabric-protos-go
+// replace github.com/ravengit/ravenpod-cc-dc-go => /Users/calvinso/projects/ravenpod-cc-dc-go
