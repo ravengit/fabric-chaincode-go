@@ -12,15 +12,15 @@ import (
 	"unicode/utf8"
 	// Ravenpod //
 	guuid "github.com/google/uuid"
-	"time"
 	"github.com/ravengit/ravenpod-cc-dc-go/instrumentation"
 	"github.com/ravengit/ravenpod-cc-dc-go/model"
+	"time"
 	// Ravenpod //
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/ravengit/fabric-protos-go/common"
-	"github.com/ravengit/fabric-protos-go/ledger/queryresult"
-	pb "github.com/ravengit/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric-protos-go/common"
+	"github.com/hyperledger/fabric-protos-go/ledger/queryresult"
+	pb "github.com/hyperledger/fabric-protos-go/peer"
 )
 
 // ChaincodeStub is an object passed to chaincode for shim side handling of
@@ -174,7 +174,7 @@ func (s *ChaincodeStub) GetState(key string) ([]byte, error) {
 	instrumentation.InstrumentStateGetter(s.GetTxID(), invocationId, "", key, "", nil, transientMap, model.EVENT_TYPE_ENTRY, entryTime)
 	defer func() {
 		instrumentation.InstrumentStateGetter(s.GetTxID(), invocationId, "", key, "", returnedValue, transientMap, model.EVENT_TYPE_EXIT, entryTime)
-    }()
+	}()
 	// Ravenpod
 	// Access public data by setting the collection to empty string
 	collection := ""
@@ -268,7 +268,7 @@ func (s *ChaincodeStub) GetPrivateData(collection string, key string) ([]byte, e
 	instrumentation.InstrumentStateGetter(s.GetTxID(), invocationId, collection, key, "", nil, transientMap, model.EVENT_TYPE_ENTRY, entryTime)
 	defer func() {
 		instrumentation.InstrumentStateGetter(s.GetTxID(), invocationId, collection, key, "", returnedValue, transientMap, model.EVENT_TYPE_EXIT, entryTime)
-    }()
+	}()
 	// Ravenpod
 	returnedValue, err = s.handler.handleGetState(collection, key, s.ChannelID, s.TxID)
 	return returnedValue, err

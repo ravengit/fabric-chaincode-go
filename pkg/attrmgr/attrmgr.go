@@ -14,7 +14,7 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/ravengit/fabric-protos-go/msp"
+	"github.com/hyperledger/fabric-protos-go/msp"
 )
 
 var (

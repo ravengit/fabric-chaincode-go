@@ -8,8 +8,8 @@ import (
 	"sort"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/ravengit/fabric-protos-go/common"
-	"github.com/ravengit/fabric-protos-go/msp"
+	"github.com/hyperledger/fabric-protos-go/common"
+	"github.com/hyperledger/fabric-protos-go/msp"
 )
 
 // stateEP implements the KeyEndorsementPolicy
